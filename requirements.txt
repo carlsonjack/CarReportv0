@@ -1,0 +1,15 @@
+fastapi==0.103.1
+uvicorn==0.23.2
+pydantic==2.3.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+ai==0.5.0
+ai-sdk==0.5.0
+numpy==1.24.3
+pandas==2.0.3
+statsmodels==0.14.0
+matplotlib==3.7.2
+causalimpact==0.3.2
+plotly==5.15.0
+

@@ -1,0 +1,172 @@
+version: '3.8'
+
+services:
+  # API Gateway
+  api-gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - auth-service
+      - report-service
+      - ai-agent-service
+      - dealer-service
+      - crm-service
+      - analytics-service
+    networks:
+      - carreport-network
+
+  # Authentication Service
+  auth-service:
+    build:
+      context: ./services/auth_service
+    environment:
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - carreport-network
+
+  # Report Generation Service
+  report-service:
+    build:
+      context: ./services/report_service
+    environment:
+      - VINDATA_API_KEY=${VINDATA_API_KEY}
+      - KBB_API_KEY=${KBB_API_KEY}
+      - NMVTIS_API_KEY=${NMVTIS_API_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - carreport-network
+
+  # AI Agent Service
+  ai-agent-service:
+    build:
+      context: ./services/ai_agent_service
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REPORT_SERVICE_URL=http://report-service:8001
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - redis
+      - postgres
+      - report-service
+    networks:
+      - carreport-network
+
+  # Dealer Dashboard Service
+  dealer-service:
+    build:
+      context: ./services/dealer_service
+    environment:
+      - REPORT_SERVICE_URL=http://report-service:8001
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - redis
+      - postgres
+      - report-service
+    networks:
+      - carreport-network
+
+  # CRM Integration Service
+  crm-service:
+    build:
+      context: ./services/crm_service
+    environment:
+      - HUBSPOT_API_KEY=${HUBSPOT_API_KEY}
+      - SALESFORCE_API_KEY=${SALESFORCE_API_KEY}
+      - DEALERSOCKET_API_KEY=${DEALERSOCKET_API_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - carreport-network
+
+  # Analytics & Monitoring Service
+  analytics-service:
+    build:
+      context: ./services/analytics_service
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - carreport-network
+
+  # Redis for caching and pub/sub
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - carreport-network
+
+  # PostgreSQL for persistent storage
+  postgres:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - carreport-network
+
+networks:
+  carreport-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  postgres-data:
+

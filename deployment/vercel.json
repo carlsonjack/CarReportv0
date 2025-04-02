@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "services/auth_service/main.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.9" }
+    },
+    {
+      "src": "services/report_service/main.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.9" }
+    },
+    {
+      "src": "services/ai_agent_service/main.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.9" }
+    },
+    {
+      "src": "services/dealer_service/main.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.9" }
+    },
+    {
+      "src": "services/crm_service/main.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.9" }
+    },
+    {
+      "src": "services/analytics_service/main.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.9" }
+    }
+  ],
+  "routes": [
+    { "src": "/auth/(.*)", "dest": "services/auth_service/main.py" },
+    { "src": "/reports/(.*)", "dest": "services/report_service/main.py" },
+    { "src": "/vin/(.*)", "dest": "services/report_service/main.py" },
+    { "src": "/ai/(.*)", "dest": "services/ai_agent_service/main.py" },
+    { "src": "/conversations/(.*)", "  "/ai/(.*)", "dest": "services/ai_agent_service/main.py" },
+    { "src": "/conversations/(.*)", "dest": "services/ai_agent_service/main.py" },
+    { "src": "/dealers/(.*)", "dest": "services/dealer_service/main.py" },
+    { "src": "/crm/(.*)", "dest": "services/crm_service/main.py" },
+    { "src": "/analytics/(.*)", "dest": "services/analytics_service/main.py" },
+    { "src": "/monitoring/(.*)", "dest": "services/analytics_service/main.py" },
+    { "src": "/(.*)", "status": 404, "dest": "404.html" }
+  ]
+}
+

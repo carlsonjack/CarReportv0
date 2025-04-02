@@ -1,0 +1,176 @@
+service: carreport-microservices
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  environment:
+    STAGE: ${self:provider.stage}
+    REDIS_HOST: ${self:custom.redis.host}
+    REDIS_PORT: ${self:custom.redis.port}
+    POSTGRES_HOST: ${self:custom.postgres.host}
+    POSTGRES_PORT: ${self:custom.postgres.port}
+    POSTGRES_USER: ${self:custom.postgres.user}
+    POSTGRES_PASSWORD: ${self:custom.postgres.password}
+    POSTGRES_DB: ${self:custom.postgres.database}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: !GetAtt DynamoDBTable.Arn
+    - Effect: Allow
+      Action:
+        - sqs:SendMessage
+        - sqs:ReceiveMessage
+        - sqs:DeleteMessage
+        - sqs:GetQueueAttributes
+      Resource: !GetAtt SQSQueue.Arn
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource: arn:aws:logs:*:*:*
+
+custom:
+  redis:
+    host: ${env:REDIS_HOST, 'localhost'}
+    port: ${env:REDIS_PORT, '6379'}
+  postgres:
+    host: ${env:POSTGRES_HOST, 'localhost'}
+    port: ${env:POSTGRES_PORT, '5432'}
+    user: ${env:POSTGRES_USER, 'postgres'}
+    password: ${env:POSTGRES_PASSWORD, 'postgres'}
+    database: ${env:POSTGRES_DB, 'carreport'}
+  pythonRequirements:
+    dockerizePip: true
+    slim: true
+    useDownloadCache: true
+    useStaticCache: true
+
+functions:
+  # Authentication Service
+  auth:
+    handler: services/auth_service/lambda_handler.handler
+    events:
+      - http:
+          path: /auth/{proxy+}
+          method: any
+          cors: true
+    environment:
+      JWT_SECRET_KEY: ${env:JWT_SECRET_KEY, 'your-secret-key'}
+
+  # Report Generation Service
+  report:
+    handler: services/report_service/lambda_handler.handler
+    events:
+      - http:
+          path: /reports/{proxy+}
+          method: any
+          cors: true
+      - http:
+          path: /vin/{proxy+}
+          method: any
+          cors: true
+    environment:
+      VINDATA_API_KEY: ${env:VINDATA_API_KEY, 'demo-key'}
+      KBB_API_KEY: ${env:KBB_API_KEY, 'demo-key'}
+      NMVTIS_API_KEY: ${env:NMVTIS_API_KEY, 'demo-key'}
+
+  # AI Agent Service
+  ai:
+    handler: services/ai_agent_service/lambda_handler.handler
+    events:
+      - http:
+          path: /ai/{proxy+}
+          method: any
+          cors: true
+      - http:
+          path: /conversations/{proxy+}
+          method: any
+          cors: true
+    environment:
+      OPENAI_API_KEY: ${env:OPENAI_API_KEY, 'demo-key'}
+      REPORT_SERVICE_URL: ${env:REPORT_SERVICE_URL, 'http://localhost:8001'}
+
+  # Dealer Dashboard Service
+  dealer:
+    handler: services/dealer_service/lambda_handler.handler
+    events:
+      - http:
+          path: /dealers/{proxy+}
+          method: any
+          cors: true
+    environment:
+      REPORT_SERVICE_URL: ${env:REPORT_SERVICE_URL, 'http://localhost:8001'}
+
+  # CRM Integration Service
+  crm:
+    handler: services/crm_service/lambda_handler.handler
+    events:
+      - http:
+          path: /crm/{proxy+}
+          method: any
+          cors: true
+    environment:
+      HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY, 'demo-key'}
+      SALESFORCE_API_KEY: ${env:SALESFORCE_API_KEY, 'demo-key'}
+      DEALERSOCKET_API_KEY: ${env:DEALERSOCKET_API_KEY, 'demo-key'}
+
+  # Analytics & Monitoring Service
+  analytics:
+    handler: services/analytics_service/lambda_handler.handler
+    events:
+      - http:
+          path: /analytics/{proxy+}
+          method: any
+          cors: true
+      - http:
+          path: /monitoring/{proxy+}
+          method: any
+          cors: true
+
+  # Event Processor (for Redis Pub/Sub replacement)
+  eventProcessor:
+    handler: services/event_processor/lambda_handler.handler
+    events:
+      - sqs:
+          arn: !GetAtt SQSQueue.Arn
+          batchSize: 10
+
+resources:
+  Resources:
+    # SQS Queue for event processing
+    SQSQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-events
+        VisibilityTimeout: 60
+        MessageRetentionPeriod: 1209600 # 14 days
+
+    # DynamoDB Table for caching
+    DynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-cache
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: key
+            AttributeType: S
+        KeySchema:
+          - AttributeName: key
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
+plugins:
+  - serverless-python-requirements
+  - serverless-offline
+
